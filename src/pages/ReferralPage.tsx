@@ -8,7 +8,12 @@ export const ReferralPage: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
 
   const referralCode = user?.referralCode || 'VEL-INVITE';
-  const referralLink = `${window.location.origin}/?ref=${referralCode}`;
+  const getReferralUrl = () => {
+    if (typeof window === 'undefined') return `https://velora.io/?ref=${referralCode}`;
+    const cleanPath = window.location.pathname.replace(/\/+$/, '');
+    return `${window.location.origin}${cleanPath}/?ref=${referralCode}`;
+  };
+  const referralLink = getReferralUrl();
 
   const totalReferrals = referrals.length;
   const activeReferrals = referrals.filter(r => r.status === 'Active').length;
@@ -19,7 +24,20 @@ export const ReferralPage: React.FC = () => {
       openAuthModal('login');
       return;
     }
-    navigator.clipboard.writeText(referralLink);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(referralLink);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = referralLink;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.warn('Clipboard write failed:', err);
+    }
     setCopied(true);
     showToast('info', 'Link Copied', 'Referral link copied to clipboard.');
     setTimeout(() => setCopied(false), 2500);

@@ -90,10 +90,67 @@ const AppContent: React.FC = () => {
   );
 };
 
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('App error caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.clear();
+      }
+    } catch {}
+    window.location.reload();
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#090b0e] text-slate-100 flex items-center justify-center p-6 text-center">
+          <div className="max-w-md bg-[#0f131a] border border-[#232c3c] rounded-2xl p-8 space-y-4 shadow-2xl">
+            <h1 className="text-xl font-bold font-mono tracking-tight text-white">VELORA</h1>
+            <p className="text-xs text-slate-400">
+              An unexpected render issue occurred. Click below to reload the platform.
+            </p>
+            <button
+              onClick={this.handleReload}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg shadow-md transition-colors"
+            >
+              Reload Platform
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </ErrorBoundary>
   );
 }

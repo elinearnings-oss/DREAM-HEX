@@ -92,17 +92,31 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEY_PREFIX = 'velora_v1_';
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Read state from localStorage or use initial mock data
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'user');
-    return saved ? JSON.parse(saved) : INITIAL_USER;
-  });
+function loadStorage<T>(key: string, fallback: T): T {
+  try {
+    if (typeof window === 'undefined' || !window.localStorage) return fallback;
+    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + key);
+    return saved ? JSON.parse(saved) : fallback;
+  } catch (e) {
+    console.warn(`Storage load failed for ${key}:`, e);
+    return fallback;
+  }
+}
 
-  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'isAdmin');
-    return saved ? JSON.parse(saved) : false;
-  });
+function saveStorage<T>(key: string, value: T): void {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(STORAGE_KEY_PREFIX + key, JSON.stringify(value));
+    }
+  } catch (e) {
+    console.warn(`Storage save failed for ${key}:`, e);
+  }
+}
+
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Read state from localStorage safely or use initial mock data
+  const [user, setUser] = useState<User | null>(() => loadStorage<User | null>('user', INITIAL_USER));
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => loadStorage<boolean>('isAdmin', false));
 
   const [activeView, setActiveView] = useState<PageView>('home');
   const [selectedProductId, setSelectedProductId] = useState<string | null>('prod-v50');
@@ -111,73 +125,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [products] = useState<Product[]>(INITIAL_PRODUCTS);
 
-  const [activeProducts, setActiveProducts] = useState<UserActiveProduct[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'activeProducts');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVE_PRODUCTS;
-  });
+  const [activeProducts, setActiveProducts] = useState<UserActiveProduct[]>(() => 
+    loadStorage<UserActiveProduct[]>('activeProducts', INITIAL_ACTIVE_PRODUCTS)
+  );
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'transactions');
-    return saved ? JSON.parse(saved) : INITIAL_TRANSACTIONS;
-  });
+  const [transactions, setTransactions] = useState<Transaction[]>(() => 
+    loadStorage<Transaction[]>('transactions', INITIAL_TRANSACTIONS)
+  );
 
-  const [referrals, setReferrals] = useState<ReferralRecord[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'referrals');
-    return saved ? JSON.parse(saved) : INITIAL_REFERRALS;
-  });
+  const [referrals, setReferrals] = useState<ReferralRecord[]>(() => 
+    loadStorage<ReferralRecord[]>('referrals', INITIAL_REFERRALS)
+  );
 
-  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'tickets');
-    return saved ? JSON.parse(saved) : INITIAL_SUPPORT_TICKETS;
-  });
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>(() => 
+    loadStorage<SupportTicket[]>('tickets', INITIAL_SUPPORT_TICKETS)
+  );
 
   // Calculate wallet dynamically from transactions or base
-  const [wallet, setWallet] = useState<WalletState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY_PREFIX + 'wallet');
-    if (saved) return JSON.parse(saved);
-    return {
+  const [wallet, setWallet] = useState<WalletState>(() => 
+    loadStorage<WalletState>('wallet', {
       availableUSDT: 42.50, // Available balance for testing purchases and withdrawals
       pendingUSDT: 0.00,
       totalProductRewardsUSDT: 3.50,
       totalReferralRewardsUSDT: 3.50,
       totalBalanceUSDT: 42.50
-    };
-  });
+    })
+  );
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
-  // LocalStorage persist
+  // LocalStorage persist safely
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'user', JSON.stringify(user));
+    saveStorage('user', user);
   }, [user]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'isAdmin', JSON.stringify(isAdmin));
+    saveStorage('isAdmin', isAdmin);
   }, [isAdmin]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'activeProducts', JSON.stringify(activeProducts));
+    saveStorage('activeProducts', activeProducts);
   }, [activeProducts]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'transactions', JSON.stringify(transactions));
+    saveStorage('transactions', transactions);
   }, [transactions]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'referrals', JSON.stringify(referrals));
+    saveStorage('referrals', referrals);
   }, [referrals]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'tickets', JSON.stringify(supportTickets));
+    saveStorage('tickets', supportTickets);
   }, [supportTickets]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY_PREFIX + 'wallet', JSON.stringify(wallet));
+    saveStorage('wallet', wallet);
   }, [wallet]);
 
-  // Window scroll to top on page view change
+  // Window scroll to top on page view change safely
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      window.scrollTo(0, 0);
+    }
   }, [activeView]);
 
   const showToast = (type: 'success' | 'error' | 'info', title: string, message: string) => {
@@ -523,13 +535,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const resetAllData = () => {
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'user');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'isAdmin');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'activeProducts');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'transactions');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'referrals');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'tickets');
-    localStorage.removeItem(STORAGE_KEY_PREFIX + 'wallet');
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'user');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'isAdmin');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'activeProducts');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'transactions');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'referrals');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'tickets');
+        localStorage.removeItem(STORAGE_KEY_PREFIX + 'wallet');
+      }
+    } catch (e) {
+      console.warn('Failed to clear storage:', e);
+    }
 
     setUser(INITIAL_USER);
     setIsAdmin(false);

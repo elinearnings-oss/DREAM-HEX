@@ -33,7 +33,20 @@ export const DepositPage: React.FC = () => {
   const activeAddress = depositAddresses[network];
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(activeAddress);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(activeAddress);
+      } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = activeAddress;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+      }
+    } catch (err) {
+      console.warn('Clipboard copy failed:', err);
+    }
     setCopied(true);
     showToast('info', 'Address Copied', `${network} deposit address copied to clipboard.`);
     setTimeout(() => setCopied(false), 2500);

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { X, Lock, Mail, User as UserIcon, ShieldCheck, ArrowRight } from 'lucide-react';
 import { BRAND_INFO } from '../../data/mockData';
+import { brandLogo } from '../../assets/images';
 
 export const AuthModal: React.FC = () => {
   const { authModalOpen, authModalMode, closeAuthModal, openAuthModal, login, register, showToast } = useApp();
@@ -88,7 +89,7 @@ export const AuthModal: React.FC = () => {
         {/* Brand Header */}
         <div className="flex items-center gap-3 mb-6">
           <img 
-            src="/src/assets/images/velora_brand_logo_1790680377503.jpg" 
+            src={brandLogo} 
             alt="VELORA" 
             className="w-8 h-8 rounded-md object-cover border border-rose-500/30"
           />

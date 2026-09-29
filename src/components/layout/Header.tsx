@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Menu, X, Shield, Wallet, ChevronDown, User as UserIcon, LogOut, ArrowUpRight } from 'lucide-react';
+import { brandLogo } from '../../assets/images';
 
 export const Header: React.FC = () => {
   const { 
@@ -33,7 +34,7 @@ export const Header: React.FC = () => {
           className="flex items-center gap-2.5 text-left group focus:outline-none focus-visible:ring-1 focus-visible:ring-rose-500 rounded"
         >
           <img 
-            src="/src/assets/images/velora_brand_logo_1790680377503.jpg" 
+            src={brandLogo} 
             alt="VELORA" 
             className="w-8 h-8 rounded-md object-cover border border-rose-500/40 group-hover:border-rose-500 transition-colors"
           />

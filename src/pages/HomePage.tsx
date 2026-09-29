@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { BRAND_INFO } from '../data/mockData';
+import { heroFintech } from '../assets/images';
 import { 
   ArrowRight, 
   Layers, 
@@ -113,7 +114,7 @@ export const HomePage: React.FC = () => {
             <div className="lg:col-span-5">
               <div className="relative rounded-xl border border-[#222d3f] bg-[#0c1017] p-2 shadow-2xl overflow-hidden group">
                 <img 
-                  src="/src/assets/images/velora_hero_fintech_1790680402245.jpg" 
+                  src={heroFintech} 
                   alt="VELORA Digital Products & Rewards" 
                   className="w-full h-auto rounded-lg object-cover brightness-95 group-hover:scale-[1.01] transition-transform duration-300"
                   referrerPolicy="no-referrer"

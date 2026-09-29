@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { BRAND_INFO } from '../../data/mockData';
 import { Mail, Send, AlertTriangle } from 'lucide-react';
+import { brandLogo } from '../../assets/images';
 
 export const Footer: React.FC = () => {
   const { setActiveView } = useApp();
@@ -15,7 +16,7 @@ export const Footer: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
               <img 
-                src="/src/assets/images/velora_brand_logo_1790680377503.jpg" 
+                src={brandLogo} 
                 alt="VELORA" 
                 className="w-7 h-7 rounded object-cover border border-rose-500/30"
               />
