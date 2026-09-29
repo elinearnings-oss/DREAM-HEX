@@ -1,0 +1,6 @@
+{
+  "name": "VELORA - Smart Products. Real Rewards",
+  "description": "VELORA is a modern digital products and rewards platform providing smart product activations and automated 24-hour reward cycles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
