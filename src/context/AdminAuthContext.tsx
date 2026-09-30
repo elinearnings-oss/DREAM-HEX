@@ -3,10 +3,14 @@ import {
   auth, 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  googleProvider,
   signOut, 
   verifyAdminStatus, 
-  hasRegisteredAdmins,
-  setupFirstAdminAccount,
+  checkMasterLockStatus,
+  establishMasterAdmin,
+  formatAuthError,
   logAdminAction,
   FirebaseUser 
 } from '../lib/firebase';
@@ -15,12 +19,21 @@ import { AdminProfile } from '../types/admin';
 interface AdminAuthContextType {
   admin: AdminProfile | null;
   firebaseUser: FirebaseUser | null;
-  loading: boolean;
-  needsInitialSetup: boolean;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  isInitializing: boolean;
+  isMasterLockPresent: boolean;
+  isEligibleForMasterSetup: boolean;
+  unauthorizedUser: FirebaseUser | null;
+  authError: string | null;
+  isEmailPasswordDisabled: boolean;
+  
+  // Actions
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  registerMasterAdminWithEmail: (email: string, pass: string, name: string) => Promise<{ success: boolean; error?: string }>;
+  claimMasterAdmin: (name?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
-  createFirstAdmin: (email: string, pass: string, name: string) => Promise<{ success: boolean; error?: string }>;
-  refreshAdminStatus: () => Promise<void>;
+  clearError: () => void;
+  checkLockStatus: () => Promise<void>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
@@ -28,107 +41,152 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [admin, setAdmin] = useState<AdminProfile | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [needsInitialSetup, setNeedsInitialSetup] = useState<boolean>(false);
+  const [unauthorizedUser, setUnauthorizedUser] = useState<FirebaseUser | null>(null);
+  const [isInitializing, setIsInitializing] = useState<boolean>(true);
+  const [isMasterLockPresent, setIsMasterLockPresent] = useState<boolean>(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isEmailPasswordDisabled, setIsEmailPasswordDisabled] = useState<boolean>(false);
 
-  const checkInitialAdminState = async () => {
+  const checkLock = async () => {
     try {
-      const hasAdmins = await hasRegisteredAdmins();
-      setNeedsInitialSetup(!hasAdmins);
+      const lockRes = await checkMasterLockStatus();
+      setIsMasterLockPresent(lockRes.isLocked);
     } catch {
-      setNeedsInitialSetup(false);
+      setIsMasterLockPresent(false);
     }
   };
 
-  const verifyAndSetAdmin = async (user: FirebaseUser | null) => {
-    setLoading(true);
+  const verifyUserSession = async (user: FirebaseUser | null) => {
     if (!user) {
       setAdmin(null);
       setFirebaseUser(null);
-      await checkInitialAdminState();
-      setLoading(false);
+      setUnauthorizedUser(null);
+      await checkLock();
+      setIsInitializing(false);
       return;
     }
 
+    setFirebaseUser(user);
+
     try {
-      const isAuthorized = await verifyAdminStatus(user.uid);
-      if (isAuthorized) {
-        setAdmin({
-          uid: user.uid,
-          email: user.email || '',
-          name: user.displayName || user.email?.split('@')[0] || 'Administrator',
-          role: 'admin',
-          createdAt: user.metadata.creationTime || new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
-        setFirebaseUser(user);
-        setNeedsInitialSetup(false);
+      // 1. Check if user is an existing authorized Admin/Manager/Master Admin in Firestore
+      const authRes = await verifyAdminStatus(user.uid);
+      if (authRes.isAuthorized && authRes.profile) {
+        setAdmin(authRes.profile);
+        setUnauthorizedUser(null);
+        setIsMasterLockPresent(true);
       } else {
-        // Logged into Firebase Auth, but not an admin in Firestore
-        console.warn(`User ${user.email} is not authorized for Admin Console.`);
-        await signOut(auth);
-        setAdmin(null);
-        setFirebaseUser(null);
-        await checkInitialAdminState();
+        // 2. Not currently an admin. Check if system has a master lock yet.
+        const lockRes = await checkMasterLockStatus();
+        setIsMasterLockPresent(lockRes.isLocked);
+
+        if (!lockRes.isLocked) {
+          // No master admin exists yet! This authenticated user can claim Master Admin!
+          setAdmin(null);
+          setUnauthorizedUser(null);
+        } else {
+          // Master admin already exists, and this user is NOT an admin
+          setAdmin(null);
+          setUnauthorizedUser(user);
+        }
       }
-    } catch (err) {
-      console.error('Error verifying admin permissions:', err);
+    } catch (err: any) {
+      console.error('Session verification error:', err);
+      const formatted = formatAuthError(err);
+      setAuthError(formatted.message);
       setAdmin(null);
-      setFirebaseUser(null);
     } finally {
-      setLoading(false);
+      setIsInitializing(false);
     }
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      await verifyAndSetAdmin(user);
+      await verifyUserSession(user);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+  const loginWithGoogle = async (): Promise<{ success: boolean; error?: string }> => {
+    setAuthError(null);
+    setIsEmailPasswordDisabled(false);
     try {
-      setLoading(true);
-      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), pass);
-      const user = userCredential.user;
-
-      const isAuthorized = await verifyAdminStatus(user.uid);
-      if (!isAuthorized) {
-        await signOut(auth);
-        setLoading(false);
-        return { 
-          success: false, 
-          error: 'Access Denied: This account does not have administrative privileges. Contact your supervisor.' 
-        };
-      }
-
-      setAdmin({
-        uid: user.uid,
-        email: user.email || '',
-        name: user.displayName || user.email?.split('@')[0] || 'Administrator',
-        role: 'admin',
-        createdAt: user.metadata.creationTime || new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      setFirebaseUser(user);
-      setNeedsInitialSetup(false);
-
-      await logAdminAction(user.email || 'unknown', 'Admin Login', 'auth', user.uid);
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      await verifyUserSession(user);
       return { success: true };
     } catch (err: any) {
-      let message = 'Failed to authenticate admin.';
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        message = 'Invalid email or password. Please re-check your credentials.';
-      } else if (err.code === 'auth/too-many-requests') {
-        message = 'Too many failed login attempts. Please wait a few moments and try again.';
-      } else if (err.message) {
-        message = err.message;
+      const formatted = formatAuthError(err);
+      setAuthError(formatted.message);
+      return { success: false, error: formatted.message };
+    }
+  };
+
+  const loginWithEmail = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    setAuthError(null);
+    setIsEmailPasswordDisabled(false);
+    try {
+      const result = await signInWithEmailAndPassword(auth, email.trim(), pass);
+      const user = result.user;
+      await verifyUserSession(user);
+      return { success: true };
+    } catch (err: any) {
+      const formatted = formatAuthError(err);
+      setAuthError(formatted.message);
+      if (formatted.isEmailPasswordDisabled) {
+        setIsEmailPasswordDisabled(true);
       }
-      return { success: false, error: message };
-    } finally {
-      setLoading(false);
+      return { success: false, error: formatted.message };
+    }
+  };
+
+  const registerMasterAdminWithEmail = async (email: string, pass: string, name: string): Promise<{ success: boolean; error?: string }> => {
+    setAuthError(null);
+    setIsEmailPasswordDisabled(false);
+    try {
+      // 1. Create account in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), pass);
+      const user = userCredential.user;
+
+      // 2. Establish Master Admin in Firestore
+      const establishRes = await establishMasterAdmin(user, name);
+      if (!establishRes.success) {
+        setAuthError(establishRes.error || 'Failed to establish master admin in database.');
+        return { success: false, error: establishRes.error };
+      }
+
+      await verifyUserSession(user);
+      return { success: true };
+    } catch (err: any) {
+      const formatted = formatAuthError(err);
+      setAuthError(formatted.message);
+      if (formatted.isEmailPasswordDisabled) {
+        setIsEmailPasswordDisabled(true);
+      }
+      return { success: false, error: formatted.message };
+    }
+  };
+
+  const claimMasterAdmin = async (name?: string): Promise<{ success: boolean; error?: string }> => {
+    setAuthError(null);
+    if (!firebaseUser) {
+      return { success: false, error: 'You must authenticate before establishing the Master Administrator.' };
+    }
+
+    try {
+      const res = await establishMasterAdmin(firebaseUser, name);
+      if (!res.success) {
+        setAuthError(res.error || 'Failed to establish master admin.');
+        return { success: false, error: res.error };
+      }
+
+      await verifyUserSession(firebaseUser);
+      return { success: true };
+    } catch (err: any) {
+      const formatted = formatAuthError(err);
+      setAuthError(formatted.message);
+      return { success: false, error: formatted.message };
     }
   };
 
@@ -140,42 +198,40 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await signOut(auth);
       setAdmin(null);
       setFirebaseUser(null);
+      setUnauthorizedUser(null);
+      setAuthError(null);
+      setIsEmailPasswordDisabled(false);
+      await checkLock();
     } catch (err) {
       console.error('Logout error:', err);
     }
   };
 
-  const createFirstAdmin = async (email: string, pass: string, name: string) => {
-    setLoading(true);
-    const result = await setupFirstAdminAccount(email.trim(), pass, name.trim());
-    if (result.success) {
-      setNeedsInitialSetup(false);
-      // Auto login
-      await login(email.trim(), pass);
-    }
-    setLoading(false);
-    return result;
+  const clearError = () => {
+    setAuthError(null);
+    setIsEmailPasswordDisabled(false);
   };
 
-  const refreshAdminStatus = async () => {
-    if (firebaseUser) {
-      await verifyAndSetAdmin(firebaseUser);
-    } else {
-      await checkInitialAdminState();
-    }
-  };
+  const isEligibleForMasterSetup = Boolean(firebaseUser && !admin && !isMasterLockPresent);
 
   return (
     <AdminAuthContext.Provider
       value={{
         admin,
         firebaseUser,
-        loading,
-        needsInitialSetup,
-        login,
+        isInitializing,
+        isMasterLockPresent,
+        isEligibleForMasterSetup,
+        unauthorizedUser,
+        authError,
+        isEmailPasswordDisabled,
+        loginWithGoogle,
+        loginWithEmail,
+        registerMasterAdminWithEmail,
+        claimMasterAdmin,
         logout,
-        createFirstAdmin,
-        refreshAdminStatus
+        clearError,
+        checkLockStatus: checkLock
       }}
     >
       {children}

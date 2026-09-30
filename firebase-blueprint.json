@@ -1,0 +1,78 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Administrator profile record with role assignment",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["master_admin", "admin", "manager"] },
+        "isMasterAdmin": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Customer member profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "registeredAt": { "type": "string" },
+        "accountStatus": { "type": "string" },
+        "walletBalanceUSDT": { "type": "number" }
+      },
+      "required": ["id", "email"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Digital computing node package with 5% reward rate",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "priceUSDT": { "type": "number" },
+        "dailyRewardRate": { "type": "number" },
+        "cycleHours": { "type": "number" }
+      },
+      "required": ["id", "name", "priceUSDT"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer product allocation order",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "productId": { "type": "string" },
+        "amount": { "type": "number" },
+        "orderStatus": { "type": "string" }
+      },
+      "required": ["id", "userId", "productId", "amount"]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Collection of authorized administrators and role mappings"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Registered customer profiles and account states"
+    },
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Product catalog and reward cycles"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Order records for active product allocations"
+    }
+  }
+}

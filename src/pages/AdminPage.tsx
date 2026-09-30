@@ -12,10 +12,73 @@ import { AdminWithdrawals } from '../components/admin/AdminWithdrawals';
 import { AdminSupport } from '../components/admin/AdminSupport';
 import { AdminSettings } from '../components/admin/AdminSettings';
 import { AdminAuditLogs } from '../components/admin/AdminAuditLogs';
-import { Shield, Lock, RefreshCw } from 'lucide-react';
+import { Shield, AlertCircle, RefreshCw, RotateCcw } from 'lucide-react';
+
+interface AdminErrorBoundaryProps {
+  children: React.ReactNode;
+  onReset: () => void;
+}
+
+interface AdminErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class AdminErrorBoundary extends React.Component<AdminErrorBoundaryProps, AdminErrorBoundaryState> {
+  constructor(props: AdminErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('Admin component error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-[#07090d] flex items-center justify-center p-6 text-slate-100">
+          <div className="max-w-md w-full bg-[#0e121a] border border-[#232d3f] rounded-2xl p-8 space-y-4 shadow-2xl text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-600/20 text-rose-500 mx-auto flex items-center justify-center">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="text-base font-bold text-white">Admin Console Render Notice</h2>
+              <p className="text-xs text-slate-400">
+                An unexpected exception was caught while displaying this console component.
+              </p>
+            </div>
+            {this.state.error?.message && (
+              <div className="p-3 bg-[#131722] rounded-xl border border-[#1f283a] text-[11px] font-mono text-rose-300 text-left overflow-x-auto">
+                {this.state.error.message}
+              </div>
+            )}
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => {
+                  this.setState({ hasError: false, error: undefined });
+                  this.props.onReset();
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-lg shadow-sm transition-colors flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reload Console</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export const AdminPage: React.FC = () => {
-  const { admin, loading, needsInitialSetup } = useAdminAuth();
+  const { admin, isInitializing } = useAdminAuth();
   const { setActiveView } = useApp();
 
   const [currentSection, setCurrentSection] = useState<AdminSection>(() => {
@@ -28,7 +91,7 @@ export const AdminPage: React.FC = () => {
     return 'dashboard';
   });
 
-  // Listen to hash changes in case of browser back/forward
+  // Listen to hash changes in case of browser back/forward navigation
   useEffect(() => {
     const handleHashChange = () => {
       if (window.location.hash) {
@@ -50,8 +113,8 @@ export const AdminPage: React.FC = () => {
     } catch {}
   };
 
-  // 1. Loading State
-  if (loading) {
+  // 1. Initial Session Loading (Only during the initial startup load)
+  if (isInitializing) {
     return (
       <div className="min-h-screen bg-[#07090d] flex flex-col items-center justify-center p-6 text-slate-100">
         <div className="w-10 h-10 border-2 border-rose-500 border-t-transparent rounded-full animate-spin mb-4" />
@@ -60,9 +123,13 @@ export const AdminPage: React.FC = () => {
     );
   }
 
-  // 2. Unauthenticated: Render Admin Login (or First Admin Setup)
+  // 2. Unauthenticated: Render Admin Login & Setup screen
   if (!admin) {
-    return <AdminLogin onBackToCustomerSite={handleExitToCustomerSite} />;
+    return (
+      <AdminErrorBoundary onReset={() => window.location.reload()}>
+        <AdminLogin onBackToCustomerSite={handleExitToCustomerSite} />
+      </AdminErrorBoundary>
+    );
   }
 
   // 3. Authenticated Admin: Render Admin Console Layout & Section
@@ -92,12 +159,14 @@ export const AdminPage: React.FC = () => {
   };
 
   return (
-    <AdminLayout
-      currentSection={currentSection}
-      onNavigate={setCurrentSection}
-      onExitToCustomerSite={handleExitToCustomerSite}
-    >
-      {renderCurrentSection()}
-    </AdminLayout>
+    <AdminErrorBoundary onReset={() => setCurrentSection('dashboard')}>
+      <AdminLayout
+        currentSection={currentSection}
+        onNavigate={setCurrentSection}
+        onExitToCustomerSite={handleExitToCustomerSite}
+      >
+        {renderCurrentSection()}
+      </AdminLayout>
+    </AdminErrorBoundary>
   );
 };

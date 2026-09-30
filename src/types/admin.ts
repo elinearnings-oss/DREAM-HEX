@@ -1,6 +1,6 @@
 import { Product, Transaction, SupportTicket, NetworkType } from './index';
 
-export type AdminRole = 'admin' | 'manager' | 'superadmin';
+export type AdminRole = 'master_admin' | 'admin' | 'manager' | 'superadmin';
 
 export interface AdminProfile {
   uid: string;
@@ -16,7 +16,7 @@ export interface AdminUserRecord {
   id: string;
   name: string;
   email: string;
-  role: 'user' | 'admin' | 'manager';
+  role: 'user' | 'admin' | 'manager' | 'master_admin';
   registeredAt: string;
   accountStatus: 'Active' | 'Under Review' | 'Suspended';
   isAgeVerified: boolean;
