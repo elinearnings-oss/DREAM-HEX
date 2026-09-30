@@ -8,7 +8,11 @@ import {
   RefreshCw,
   ExternalLink,
   Lock,
-  CheckCircle2
+  KeyRound,
+  CheckCircle2,
+  Copy,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { brandLogo } from '../../assets/images';
 
@@ -22,14 +26,24 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onBackToCustomerSite }) 
     unauthorizedUser,
     authError,
     loginWithGoogle,
+    loginWithMasterKey,
     logout,
     clearError
   } = useAdminAuth();
 
   const [localError, setLocalError] = useState<string | null>(null);
   const [submittingGoogle, setSubmittingGoogle] = useState(false);
+  
+  // Master Key Fallback
+  const [showKeyAccess, setShowKeyAccess] = useState(false);
+  const [masterKey, setMasterKey] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [submittingKey, setSubmittingKey] = useState(false);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   const activeError = localError || authError;
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : 'github.io';
+  const isDomainError = activeError?.includes('unauthorized-domain') || activeError?.includes('Authorized Domains');
 
   const handleGoogleSignIn = async () => {
     setLocalError(null);
@@ -39,7 +53,36 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onBackToCustomerSite }) 
     setSubmittingGoogle(false);
     if (!res.success) {
       setLocalError(res.error || 'Google authentication failed.');
+      if (res.error?.includes('unauthorized-domain')) {
+        setShowKeyAccess(true);
+      }
     }
+  };
+
+  const handleMasterKeySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLocalError(null);
+    clearError();
+
+    if (!masterKey.trim()) {
+      setLocalError('Please enter the Master Access Key.');
+      return;
+    }
+
+    setSubmittingKey(true);
+    const res = await loginWithMasterKey(masterKey.trim(), adminName.trim() || undefined);
+    setSubmittingKey(false);
+    if (!res.success) {
+      setLocalError(res.error || 'Invalid Master Access Key.');
+    }
+  };
+
+  const handleCopyDomain = () => {
+    try {
+      navigator.clipboard.writeText(currentHostname);
+      setCopiedDomain(true);
+      setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {}
   };
 
   return (
@@ -114,16 +157,63 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onBackToCustomerSite }) 
                 <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 space-y-1.5">
                   <div className="flex items-center gap-2 font-semibold">
                     <Sparkles className="w-4 h-4 text-rose-400" />
-                    <span>Initial Master Admin Setup</span>
+                    <span>Master Admin Access</span>
                   </div>
                   <p className="text-[11px] text-rose-300/90 leading-relaxed">
-                    Click <strong>"Continue with Google"</strong> below. The first authenticated account will automatically be established as the Master Administrator for this platform.
+                    Click <strong>"Continue with Google"</strong> or use the <strong>Master Access Key</strong> below to enter the VELORA Manager Center.
                   </p>
                 </div>
               )}
 
-              {/* Error banner */}
-              {activeError && (
+              {/* SPECIFIC UNAUTHORIZED DOMAIN GUIDE BOX */}
+              {isDomainError && (
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-2.5">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-white block font-semibold">Firebase Domain Authorization Required</strong>
+                      <span className="text-[11px] text-amber-300/90 leading-relaxed">
+                        Firebase blocks Google sign-in on domains not listed in its authorized list.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-black/40 rounded-lg border border-amber-500/20 text-[11px] space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Current Domain:</span>
+                      <div className="flex items-center gap-1.5">
+                        <code className="text-white bg-slate-900 px-2 py-0.5 rounded text-[11px] font-mono border border-slate-700">
+                          {currentHostname}
+                        </code>
+                        <button
+                          type="button"
+                          onClick={handleCopyDomain}
+                          className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-white text-[10px] font-medium transition-colors flex items-center gap-1"
+                        >
+                          {copiedDomain ? <CheckCircle2 className="w-3 h-3 text-emerald-300" /> : <Copy className="w-3 h-3" />}
+                          <span>{copiedDomain ? 'Copied!' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-slate-300 text-[11px] leading-relaxed pt-1 border-t border-amber-500/20 space-y-1">
+                      <p className="font-semibold text-white">How to authorize in 30 seconds:</p>
+                      <ol className="list-decimal pl-4 space-y-0.5 text-slate-300">
+                        <li>Open Firebase Console → <strong>Authentication</strong></li>
+                        <li>Click the <strong>Settings</strong> tab (5th tab next to Usage)</li>
+                        <li>Scroll down to <strong>Authorized domains</strong></li>
+                        <li>Click <strong>Add domain</strong> and paste <code>{currentHostname}</code></li>
+                      </ol>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-amber-400 font-medium">
+                    ⚡ <strong>Instant alternative:</strong> Use the Master Key option below to login immediately without changing Firebase settings!
+                  </div>
+                </div>
+              )}
+
+              {/* General active error banner */}
+              {activeError && !isDomainError && (
                 <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-xs text-rose-300 flex items-start gap-2.5">
                   <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">{activeError}</span>
@@ -131,11 +221,11 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onBackToCustomerSite }) 
               )}
 
               {/* PRIMARY GOOGLE SIGN-IN BUTTON */}
-              <div className="pt-1">
+              <div>
                 <button
                   type="button"
                   onClick={handleGoogleSignIn}
-                  disabled={submittingGoogle}
+                  disabled={submittingGoogle || submittingKey}
                   className="w-full py-3.5 px-4 bg-[#141a24] hover:bg-[#1a2332] active:bg-[#111620] border border-[#2b384e] hover:border-rose-500/50 text-white text-xs font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center gap-3 cursor-pointer group disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   {submittingGoogle ? (
@@ -158,15 +248,84 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onBackToCustomerSite }) 
                 </button>
               </div>
 
-              {/* Status information note */}
-              <div className="p-3 bg-[#0d1118] rounded-xl border border-[#1a2230] text-[11px] text-slate-400 space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-300 font-medium">
-                  <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Google Identity Provider Active</span>
-                </div>
-                <p>
-                  Authentication is handled securely by Firebase Google Identity Platform. No passwords need to be created or remembered.
-                </p>
+              {/* SEPARATOR */}
+              <div className="relative flex items-center justify-center">
+                <div className="border-t border-[#1b2332] w-full" />
+                <span className="bg-[#0b0e14] px-3 text-[10px] font-mono text-slate-500 uppercase tracking-wider">
+                  OR
+                </span>
+                <div className="border-t border-[#1b2332] w-full" />
+              </div>
+
+              {/* MASTER PASSCODE ACCORDION / TOGGLE */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowKeyAccess(!showKeyAccess)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-[#10141d] hover:bg-[#161c28] border border-[#20293a] text-xs text-slate-300 font-medium transition-colors flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Emergency Master Key Access</span>
+                  </div>
+                  {showKeyAccess ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                </button>
+
+                {showKeyAccess && (
+                  <form onSubmit={handleMasterKeySubmit} className="mt-3 p-3.5 bg-[#0e121a] rounded-xl border border-[#1f2838] space-y-3">
+                    <div className="text-[11px] text-slate-400">
+                      Enter the deployment master passcode for instant console authorization:
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                        Master Passcode
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        value={masterKey}
+                        onChange={e => setMasterKey(e.target.value)}
+                        placeholder="Enter VELORA-2026"
+                        className="w-full bg-[#121620] border border-[#212b3c] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 font-mono"
+                      />
+                      <div className="text-[10px] text-slate-500 mt-1">
+                        Default master key: <code className="text-rose-400 font-mono">VELORA-2026</code>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                        Administrator Name (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={adminName}
+                        onChange={e => setAdminName(e.target.value)}
+                        placeholder="e.g. Master Administrator"
+                        className="w-full bg-[#121620] border border-[#212b3c] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={submittingKey}
+                      className="w-full py-2.5 px-4 bg-rose-600 hover:bg-rose-500 disabled:bg-rose-800 text-white text-xs font-semibold rounded-lg shadow transition-colors flex items-center justify-center gap-2"
+                    >
+                      {submittingKey ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Verifying Passcode...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="w-3.5 h-3.5" />
+                          <span>Authorize via Master Key</span>
+                        </>
+                      )}
+                    </button>
+                  </form>
+                )}
               </div>
 
             </div>

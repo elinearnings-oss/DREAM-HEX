@@ -80,7 +80,7 @@ export type { FirebaseUser };
 /**
  * Format any Firebase Auth or Firestore error into actionable user feedback
  */
-export function formatAuthError(err: any): { message: string; isEmailPasswordDisabled?: boolean } {
+export function formatAuthError(err: any): { message: string; isEmailPasswordDisabled?: boolean; isUnauthorizedDomain?: boolean } {
   if (!err) return { message: 'An unknown error occurred.' };
 
   const code = err.code || '';
@@ -112,6 +112,13 @@ export function formatAuthError(err: any): { message: string; isEmailPasswordDis
   }
   if (code === 'auth/network-request-failed') {
     return { message: 'Network connection issue connecting to Firebase. Check your internet connection.' };
+  }
+  if (code === 'auth/unauthorized-domain' || rawMsg.includes('unauthorized-domain')) {
+    const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+    return {
+      message: `Domain "${currentDomain}" is not in Firebase Authorized Domains list. Please add "${currentDomain}" in Firebase Console → Authentication → Settings tab → Authorized domains, or use the Master Key access below.`,
+      isUnauthorizedDomain: true
+    };
   }
   if (code === 'permission-denied' || rawMsg.includes('permission-denied') || rawMsg.includes('insufficient permissions')) {
     return { message: 'Firestore security rules rejected the request: Missing administrative role in database.' };

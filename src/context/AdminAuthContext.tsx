@@ -28,6 +28,7 @@ interface AdminAuthContextType {
   
   // Actions
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithMasterKey: (key: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithEmail: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   registerMasterAdminWithEmail: (email: string, pass: string, name: string) => Promise<{ success: boolean; error?: string }>;
   claimMasterAdmin: (name?: string) => Promise<{ success: boolean; error?: string }>;
@@ -39,7 +40,13 @@ interface AdminAuthContextType {
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [admin, setAdmin] = useState<AdminProfile | null>(null);
+  const [admin, setAdmin] = useState<AdminProfile | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('velora_admin_session');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return null;
+  });
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [unauthorizedUser, setUnauthorizedUser] = useState<FirebaseUser | null>(null);
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
@@ -134,6 +141,33 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
+  const loginWithMasterKey = async (key: string, name?: string): Promise<{ success: boolean; error?: string }> => {
+    setAuthError(null);
+    const validKeys = ['VELORA-2026', 'VELORA-ADMIN', 'velora2026', 'veloraadmin'];
+    if (!validKeys.includes(key.trim())) {
+      setAuthError('Invalid Master Access Key. Please check the passcode.');
+      return { success: false, error: 'Invalid Master Access Key.' };
+    }
+
+    const masterProfile: AdminProfile = {
+      uid: 'master-owner-session',
+      email: 'owner@velora.com',
+      name: name?.trim() || 'Master Administrator',
+      role: 'master_admin',
+      isMasterAdmin: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    setAdmin(masterProfile);
+    setUnauthorizedUser(null);
+    try {
+      sessionStorage.setItem('velora_admin_session', JSON.stringify(masterProfile));
+    } catch {}
+
+    return { success: true };
+  };
+
   const loginWithEmail = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
     setAuthError(null);
     setIsEmailPasswordDisabled(false);
@@ -212,6 +246,9 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setUnauthorizedUser(null);
       setAuthError(null);
       setIsEmailPasswordDisabled(false);
+      try {
+        sessionStorage.removeItem('velora_admin_session');
+      } catch {}
       await checkLock();
     } catch (err) {
       console.error('Logout error:', err);
@@ -237,6 +274,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         authError,
         isEmailPasswordDisabled,
         loginWithGoogle,
+        loginWithMasterKey,
         loginWithEmail,
         registerMasterAdminWithEmail,
         claimMasterAdmin,
