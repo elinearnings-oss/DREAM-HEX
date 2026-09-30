@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { AdminAuthProvider } from './context/AdminAuthContext';
 import { Header } from './components/layout/Header';
 import { Footer } from './components/layout/Footer';
 import { MobileNav } from './components/layout/MobileNav';
@@ -27,7 +28,39 @@ import { LegalPage } from './pages/LegalPage';
 import { AdminPage } from './pages/AdminPage';
 
 const AppContent: React.FC = () => {
-  const { activeView } = useApp();
+  const { activeView, setActiveView } = useApp();
+
+  // Detect URL path or hash like /admin, /admin/login, #admin on mount and hash changes
+  useEffect(() => {
+    const checkAdminRoute = () => {
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const hash = window.location.hash;
+        if (path.includes('/admin') || hash.startsWith('#admin')) {
+          setActiveView('admin');
+        }
+      }
+    };
+
+    checkAdminRoute();
+    window.addEventListener('hashchange', checkAdminRoute);
+    window.addEventListener('popstate', checkAdminRoute);
+
+    return () => {
+      window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('popstate', checkAdminRoute);
+    };
+  }, [setActiveView]);
+
+  // If in Admin Console, render dedicated Admin Console without customer navbars
+  if (activeView === 'admin') {
+    return (
+      <div className="min-h-screen bg-[#07090d] text-slate-100 selection:bg-rose-500/20 selection:text-rose-200">
+        <AdminPage />
+        <ToastContainer />
+      </div>
+    );
+  }
 
   const renderCurrentView = () => {
     switch (activeView) {
@@ -61,8 +94,6 @@ const AppContent: React.FC = () => {
         return <LegalPage initialTab="terms" />;
       case 'disclaimer':
         return <LegalPage initialTab="disclaimer" />;
-      case 'admin':
-        return <AdminPage />;
       default:
         return <HomePage />;
     }
@@ -148,9 +179,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <AdminAuthProvider>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AdminAuthProvider>
     </ErrorBoundary>
   );
 }

@@ -165,6 +165,14 @@ export const Footer: React.FC = () => {
               <li className="pt-2 text-[11px] text-slate-400 leading-relaxed">
                 Eligible participants must be 18 years of age or older.
               </li>
+              <li className="pt-1">
+                <button 
+                  onClick={() => setActiveView('admin')} 
+                  className="text-slate-600 hover:text-slate-400 transition-colors text-left flex items-center gap-1 text-[11px]"
+                >
+                  <span>Staff & Manager Access</span>
+                </button>
+              </li>
             </ul>
           </div>
 

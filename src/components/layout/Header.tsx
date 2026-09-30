@@ -83,22 +83,8 @@ export const Header: React.FC = () => {
           </button>
         </nav>
 
-        {/* ZONE 3: PRIMARY ACTIONS (Wallet balance, Dashboard/Login, Admin Toggle) */}
+        {/* ZONE 3: PRIMARY ACTIONS (Wallet balance, Dashboard/Login) */}
         <div className="flex items-center gap-3">
-          {/* Quick Admin Simulator Toggle */}
-          <button
-            onClick={toggleAdminRole}
-            title={isAdmin ? "Switch to User View" : "Simulate Admin Console"}
-            className={`hidden xl:inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded border transition-colors whitespace-nowrap ${
-              isAdmin 
-                ? 'bg-rose-500/10 border-rose-500/30 text-rose-300' 
-                : 'bg-[#121620] border-[#222b3b] text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>{isAdmin ? 'Admin Active' : 'Admin Demo'}</span>
-          </button>
-
           {user ? (
             <div className="relative">
               <div className="flex items-center gap-2">
@@ -276,21 +262,13 @@ export const Header: React.FC = () => {
             FAQ
           </button>
 
-          <div className="pt-3 border-t border-[#1e2635] flex items-center justify-between">
+          <div className="pt-3 border-t border-[#1e2635]">
             <button
-              onClick={toggleAdminRole}
-              className="text-xs text-rose-400 font-mono py-1 px-2 rounded bg-rose-950/30 border border-rose-800/30"
+              onClick={() => handleNav('admin')}
+              className="text-xs text-slate-500 hover:text-slate-300 font-mono py-1 px-2"
             >
-              Toggle Admin Demo ({isAdmin ? 'Active' : 'Off'})
+              Manager Portal
             </button>
-            {isAdmin && (
-              <button
-                onClick={() => handleNav('admin')}
-                className="text-xs text-rose-400 font-semibold"
-              >
-                Go to Admin
-              </button>
-            )}
           </div>
         </div>
       )}
