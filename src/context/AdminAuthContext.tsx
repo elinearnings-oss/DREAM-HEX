@@ -81,7 +81,18 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setIsMasterLockPresent(lockRes.isLocked);
 
         if (!lockRes.isLocked) {
-          // No master admin exists yet! This authenticated user can claim Master Admin!
+          // No master admin exists yet! Automatically establish this first authenticated user as Master Admin!
+          try {
+            const establishRes = await establishMasterAdmin(user);
+            if (establishRes.success && establishRes.profile) {
+              setAdmin(establishRes.profile);
+              setUnauthorizedUser(null);
+              setIsMasterLockPresent(true);
+              return;
+            }
+          } catch (e) {
+            console.error('Auto-establish master admin failed:', e);
+          }
           setAdmin(null);
           setUnauthorizedUser(null);
         } else {
